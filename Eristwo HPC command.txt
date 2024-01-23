@@ -1,0 +1,350 @@
+#module load
+module use /apps/modulefiles/base
+module load trimmomatic/0.36
+conda activate human
+
+#download data
+bsub -q filemove curl --silent -o "231016_CFTR_mouse.tar" "https://dlmp-research.s3.amazonaws.com/labs/salipante/transfer/external/231016_CFTR_mouse.tar?AWSAccessKeyId=ASIA2QGGSOBK6CR3XI6J&Signature=daVx9KCza%2FbDZy7elQcBSP6e8nc%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEHYaCXVzLXdlc3QtMiJGMEQCIG0dyINlTgKRp7LWfSXIqZJF%2F%2BVEMpQ8gVf2BV5ZPTHJAiAalBDdcoWwGiHRObpYXq4IOizih%2FhEU472PWRyjzOU0yqYBAiP%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F8BEAAaDDcyMTk3MDk1MDIyOSIMnlW%2BdRhas6kNDxvaKuwDoq7wzoAJ5krqeA93qNd7sOOZ%2FQ5eWUzNTX6uWJR26L50V1b9y12kp4DaclWEpZvKPbdXR9VSAeSJveawrDgKeNhwYetmdSqAN6JmToXNm0LibKrqZQBZuUH3azepm1H8NKZaWozwd8S7a0h5%2BPQXXWdCKhf0VToMUurpcLTHZnRKzrsAesRcQ6gkpKxN3HGUKQy0IvOZ2iDt90Ko6if5m2ng%2Bg6kkVfiOHphjEmaoobodGcFtI72jTj3nzPXoABK6p7LZJjwcKKzZwYos7lYFQnzKm211%2Fg3KrAW%2BN%2BnP0seDEf6AE78Ik4jUCuXWH5dGkq7ZOz9dTBnGPxb7VKoIpa%2BrO9Xztw%2Fps0kJJ1hZ8vQMfgBEazVsO5h8ZHHMDNnFBapnP9e7VNalVXWJ8lLzl1L4qKirmPu3%2FxfQzXeDgzDuZKqLwMFGtSydmLvXTVWtnEvrzO9jEg437T4%2Fz75MOou%2BV4jBWVy35fBuE3h23lVFDcCOfzD8yrx7xjtR%2F1xk%2B0Kv9ThXJxBAbuPC%2FNWpQ4Xo3ouMH9FM3PV5k8tQiL1qhb38TW%2FWKUkp6j%2F5hUmE%2BZY%2Fkaf1U9w1MUVZTgNC7ggJQaL0cd%2B9WhoSGuvZAjOGRafRR8fVfLh9zkwWsU%2BkgVHZNH2XcExRwLpMJmsuqkGOqYBbNilu95LET%2BOQDMV48I27oytgvv%2FNzEj84GBF7o7YK6Af1ncEz9FQRhLsKLqsV%2B4966MmWmtDExOco8wf7lOW5fsE45AaJ6fBVvXODAnwcrqeJdXARnzqPA0%2FPZ0g%2BKqNuGs4n%2BQtHgUrK5Pxh1akfnevJ%2Bzje3qqseJR%2BvukZS3Y3754jL%2F2nX3cewqqOQ4ge%2FhwBACBgBFR2vo3kMRBVopW%2BmrgQ%3D%3D&Expires=1697595947"
+
+#extract data
+bsub -q normal tar -xvf 231016_CFTR_mouse.tar -C ../scratch/
+
+#fastqc check quality
+bsub -q normal -J 337-Female-CF fastqc *.fastq.gz
+bsub -q normal -J 337-Female-WT fastqc *.fastq.gz
+bsub -q bigmem -J 352-Female-WT fastqc *.fastq.gz
+bsub -q bigmem -J 352-Female-KO fastqc *.fastq.gz
+bsub -q bigmem -J 352-Male fastqc *.fastq.gz
+bsub -q bigmem -J 337-Male fastqc *.fastq.gz
+
+#update humann to v3.6
+conda install -c biobakery humann
+
+#update metaphlan to v4.0.6
+conda install -c bioconda metaphlan
+
+#install kneaddate to v0.10.0
+#there is a bug in v0.12.0 that doesn't recognize paired reads
+conda install -c biobakery kneaddata==0.10.0
+
+#update humann databases
+
+bsub -q bigmem -J chocophlan -v 32000 "humann_databases --download chocophlan full ./humann_DB_2023 --update-config yes"
+
+bsub -q bigmem -J diamond -v 32000 "humann_databases --download uniref uniref90_diamond ./humann_DB_2023 --update-config yes"
+
+bsub -q bigmem -J utility -v 32000 "humann_databases --download utility_mapping full ./humann_DB_2023 --update-config yes"
+
+
+#update humann_config 
+humann_config --update run_modes threads 12
+
+#filter host conmainant reads by kneaddata
+bsub -q bigmem -v 120000 -R 'rusage[mem=120000]' -J 337-9N kneaddata --input 337-9_N_S21_R1_001.fastq.gz --input 337-9_N_S21_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-9N --output-prefix 337-9N --processes 4
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-15B kneaddata --input 337-15_B_S26_R1_001.fastq.gz --input 337-15_B_S26_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-15B --output-prefix 337-15B --processes 6
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-5N kneaddata --input 337-5_N_S22_R1_001.fastq.gz --input 337-5_N_S22_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-5N --output-prefix 337-5N --processes 6
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-15L kneaddata --input 337-15_L_S23_R1_001.fastq.gz --input 337-15_L_S23_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-15L --output-prefix 337-15L --processes 6
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-15R kneaddata --input 337-15_R_S24_R1_001.fastq.gz --input 337-15_R_S24_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-15R --output-prefix 337-15R --processes 6
+
+bsub -q bigmem -v 80000 -R 'rusage[mem=80000]' -J 337-15N kneaddata --input 337-15_N_S25_R1_001.fastq.gz --input 337-15_N_S25_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-15N --output-prefix 337-15N --processes 6
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-172M kneaddata --input 337-17_2M_S27_R1_001.fastq.gz --input 337-17_2M_S27_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-172M --output-prefix 337-172M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-12N kneaddata --input 337-12_N_S12_R1_001.fastq.gz --input 337-12_N_S12_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-12N --output-prefix 337-12N --processes 4
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-4N kneaddata --input 337-4_N_S13_R1_001.fastq.gz --input 337-4_N_S13_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-4N --output-prefix 337-4N --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-4R kneaddata --input 337-4_R_S14_R1_001.fastq.gz --input 337-4_R_S14_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-4R --output-prefix 337-4R --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-8L kneaddata --input 337-8_L_S15_R1_001.fastq.gz --input 337-8_L_S15_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-8L --output-prefix 337-8L --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-16L kneaddata --input 337-16_L_S16_R1_001.fastq.gz --input 337-16_L_S16_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-16L --output-prefix 337-16L --processes 6
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-16R kneaddata --input 337-16_R_S17_R1_001.fastq.gz --input 337-16_R_S17_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-16R --output-prefix 337-16R --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-16N kneaddata --input 337-16_N_S18_R1_001.fastq.gz --input 337-16_N_S18_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-16N --output-prefix 337-16N --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-16B kneaddata --input 337-16_B_S19_R1_001.fastq.gz --input 337-16_B_S19_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-16B --output-prefix 337-16B --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 337-184M kneaddata --input 337-18_4M_S20_R1_001.fastq.gz --input 337-18_4M_S20_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 337-184M --output-prefix 337-184M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-23M kneaddata --input 352-2_3M_S1_R1_001.fastq.gz --input 352-2_3M_S1_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-23M --output-prefix 352-23M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-55M kneaddata --input 352-5_5M_S2_R1_001.fastq.gz --input 352-5_5M_S2_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-55M --output-prefix 352-55M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-81M kneaddata --input 352-8_1M_S3_R1_001.fastq.gz --input 352-8_1M_S3_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-81M --output-prefix 352-81M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-72M kneaddata --input 352-7_2M_S4_R1_001.fastq.gz --input 352-7_2M_S4_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-72M --output-prefix 352-72M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-73M kneaddata --input 352-7_3M_S5_R1_001.fastq.gz --input 352-7_3M_S5_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-73M --output-prefix 352-73M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-20M kneaddata --input 352-2_0M_S6_R1_001.fastq.gz --input 352-2_0M_S6_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-20M --output-prefix 352-20M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-40M kneaddata --input 352-4_0M_S7_R1_001.fastq.gz --input 352-4_0M_S7_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-40M --output-prefix 352-40M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-53M kneaddata --input 352-5_3M_S8_R1_001.fastq.gz --input 352-5_3M_S8_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-53M --output-prefix 352-53M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-70M kneaddata --input 352-7_0M_S9_R1_001.fastq.gz --input 352-7_0M_S9_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-70M --output-prefix 352-70M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-71M kneaddata --input 352-7_1M_S10_R1_001.fastq.gz --input 352-7_1M_S10_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-71M --output-prefix 352-71M --processes 12
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J 352-80M kneaddata --input 352-8_0M_S11_R1_001.fastq.gz --input 352-8_0M_S11_R2_001.fastq.gz --reference-db /PHShome/xy090/MouseReferenceGenome/GRCm39.bowtie2 --output 352-80M --output-prefix 352-80M --processes 12
+
+#kneaddata table summary
+bsub -q bigmem kneaddata_read_count_table --input 337-male-kneaddata --output 337-male-kneaddata.tsv
+
+bsub -q bigmem kneaddata_read_count_table --input 352-male-kneaddata --output 352-male-kneaddata.tsv
+
+#gzip 
+bsub -q bigmem gzip *.fastq
+
+#concatenate fastq.gz files from kneaddata output 
+bsub -q bigmem -J 337-12N "cat 337-12N/*.fastq.gz > ./337-12N.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-4N/*.fastq.gz > ./337-4N.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-4R/*.fastq.gz > ./337-4R.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-16L/*.fastq.gz > ./337-16L.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-15L/*.fastq.gz > ./337-15L.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-15R/*.fastq.gz > ./337-15R.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-15B/*.fastq.gz > ./337-15B.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-172M/*.fastq.gz > ./337-172M.filtered.fastq.gz"
+
+bsub -q normal "cat 337-8L/*.fastq.gz > ./337-8L.filtered.fastq.gz"
+
+bsub -q normal "cat 337-16N/*.fastq.gz > ./337-16N.filtered.fastq.gz"
+
+bsub -q normal "cat 337-16B/*.fastq.gz > ./337-16B.filtered.fastq.gz"
+
+bsub -q normal "cat 337-16R/*.fastq.gz > ./337-16R.filtered.fastq.gz"
+
+bsub -q normal "cat 337-15N/*.fastq.gz > ./337-15N.filtered.fastq.gz"
+
+bsub -q normal "cat 337-5N/*.fastq.gz > ./337-5N.filtered.fastq.gz"
+
+bsub -q bigmem "cat 337-184M/*.fastq.gz > ./337-184M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-23M/*.fastq.gz > ./352-23M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-55M/*.fastq.gz > ./352-55M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-81M/*.fastq.gz > ./352-81M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-72M/*.fastq.gz > ./352-72M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-73M/*.fastq.gz > ./352-73M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-20M/*.fastq.gz > ./352-20M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-40M/*.fastq.gz > ./352-40M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-53M/*.fastq.gz > ./352-53M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-70M/*.fastq.gz > ./352-70M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-71M/*.fastq.gz > ./352-71M.filtered.fastq.gz"
+
+bsub -q bigmem "cat 352-80M/*.fastq.gz > ./352-80M.filtered.fastq.gz"
+
+#humann 3.6
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33712n humann --input 337-12N.filtered.fastq.gz --output ./337-12N-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 100000 -R 'rusage[mem=100000]' -J hm-3379n humann --input 337-9N.filtered.fastq.gz  --resume --output 337-9N-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 80000 -R 'rusage[mem=80000]' -J hm-3375n humann --input 337-5N.filtered.fastq.gz --output 337-5N-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-3374n humann --input 337-4N.filtered.fastq.gz --output 337-4N-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33716r humann --input 337-16R.filtered.fastq.gz --output 337-16R-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-3374r humann --input 337-4R.filtered.fastq.gz --output 337-4R-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-3378l humann --input 337-8L.filtered.fastq.gz --output 337-8L-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33716l humann --input 337-16L.filtered.fastq.gz --output 337-16L-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33716n humann --input 337-16N.filtered.fastq.gz --output 337-16N-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33716b humann --input 337-16B.filtered.fastq.gz --output 337-16B-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-337184m humann --input 337-184M.filtered.fastq.gz --output 337-184M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-337172m humann --input 337-172M.filtered.fastq.gz --output 337-172M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33715l humann --input 337-15L.filtered.fastq.gz --output 337-15L-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33715n humann --input 337-15N.filtered.fastq.gz --output 337-15N-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33715b humann --input 337-15B.filtered.fastq.gz --output 337-15B-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-33715r humann --input 337-15R.filtered.fastq.gz --output 337-15R-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35223m humann --input 352-23M.filtered.fastq.gz --output 352-23M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35255m humann --input 352-55M.filtered.fastq.gz --output 352-55M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35281m humann --input 352-81M.filtered.fastq.gz --output 352-81M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35272m humann --input 352-72M.filtered.fastq.gz --output 352-72M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35273m humann --input 352-73M.filtered.fastq.gz --output 352-73M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35220m humann --input 352-20M.filtered.fastq.gz --output 352-20M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35240m humann --input 352-40M.filtered.fastq.gz --output 352-40M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35253m humann --input 352-53M.filtered.fastq.gz --output 352-53M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35270m humann --input 352-70M.filtered.fastq.gz --output 352-70M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35271m humann --input 352-71M.filtered.fastq.gz --output 352-71M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+bsub -q bigmem -v 64000 -R 'rusage[mem=64000]' -J hm-35280m humann --input 352-80M.filtered.fastq.gz --output 352-80M-humann --metaphlan-options="--index mpa_vJan21_CHOCOPhlAnSGB_202103"
+
+#compress humann-temp folder
+bsub -q bigmem -J tar-80M tar -czvf 352-80M-humann-temp.tar.gz ./352-80M.filtered_humann_temp
+
+bsub -q bigmem -J tar-71M tar -czvf 352-71M-humann/352-71M-humann-temp.tar.gz 352-71M-humann/352-71M.filtered_humann_temp
+
+bsub -q bigmem -J tar-20M tar -czvf 352-20M-humann/352-20M-humann-temp.tar.gz 352-20M-humann/352-20M.filtered_humann_temp
+
+bsub -q bigmem -J tar-73M tar -czvf 352-73M-humann/352-73M-humann-temp.tar.gz 352-73M-humann/352-73M.filtered_humann_temp
+
+bsub -q bigmem -J tar-40M tar -czvf 352-40M-humann/352-40M-humann-temp.tar.gz 352-40M-humann/352-40M.filtered_humann_temp
+
+bsub -q bigmem -J tar-70M tar -czvf 352-70M-humann/352-70M-humann-temp.tar.gz 352-70M-humann/352-70M.filtered_humann_temp
+
+bsub -q bigmem -J tar-53M tar -czvf 352-53M-humann/352-53M-humann-temp.tar.gz 352-53M-humann/352-53M.filtered_humann_temp
+
+bsub -q bigmem -J tar-23M tar -czvf 352-23M-humann/352-23M-humann-temp.tar.gz 352-23M-humann/352-23M.filtered_humann_temp
+
+bsub -q bigmem -J tar-55M tar -czvf 352-55M-humann/352-55M-humann-temp.tar.gz 352-55M-humann/352-55M.filtered_humann_temp
+
+bsub -q bigmem -J tar-81M tar -czvf 352-81M-humann/352-81M-humann-temp.tar.gz 352-81M-humann/352-81M.filtered_humann_temp
+
+bsub -q bigmem -J tar-72M tar -czvf 352-72M-humann/352-72M-humann-temp.tar.gz 352-72M-humann/352-72M.filtered_humann_temp
+
+bsub -q bigmem -J tar-12N tar -czvf 337-12N-humann/337-12N-humann-temp.tar.gz 337-12N-humann/337-12N.filtered_humann_temp
+
+bsub -q bigmem -J tar-9N-1 tar -czvf 337-9N-humann/337-9N-humann-temp1.tar.gz 337-9N-humann/337-9N.filtered_humann_temp/337-9N-temp-1
+
+bsub -q bigmem -J tar-9N-2 tar -czvf 337-9N-humann/337-9N-humann-temp2.tar.gz 337-9N-humann/337-9N.filtered_humann_temp/337-9N-temp-2
+
+bsub -q bigmem -J tar-9N-3 tar -czvf 337-9N-humann/337-9N-humann-temp3.tar.gz 337-9N-humann/337-9N.filtered_humann_temp/337-9N-temp-3
+
+bsub -q bigmem -J tar-4N tar -czvf 337-4N-humann/337-4N-humann-temp.tar.gz 337-4N-humann/337-4N.filtered_humann_temp
+
+bsub -q bigmem -J tar-5N tar -czvf 337-5N-humann/337-5N-humann-temp.tar.gz 337-5N-humann/337-5N.filtered_humann_temp
+
+bsub -q bigmem -J tar-16R tar -czvf 337-16R-humann/337-16R-humann-temp.tar.gz 337-16R-humann/337-16R.filtered_humann_temp
+
+bsub -q bigmem -J tar-16L tar -czvf 337-16L-humann/337-16L-humann-temp.tar.gz 337-16L-humann/337-16L.filtered_humann_temp
+
+bsub -q bigmem -J tar-16B tar -czvf 337-16B-humann/337-16B-humann-temp.tar.gz 337-16B-humann/337-16B.filtered_humann_temp
+
+bsub -q bigmem -J tar-8L tar -czvf 337-8L-humann/337-8L-humann-temp.tar.gz 337-8L-humann/337-8L.filtered_humann_temp
+
+bsub -q bigmem -J tar-4R tar -czvf 337-4R-humann/337-4R-humann-temp.tar.gz 337-4R-humann/337-4R.filtered_humann_temp
+
+bsub -q bigmem -J tar-15N tar -czvf 337-15N-humann/337-15N-humann-temp.tar.gz 337-15N-humann/337-15N.filtered_humann_temp
+
+bsub -q bigmem -J tar-15B tar -czvf 337-15B-humann/337-15B-humann-temp.tar.gz 337-15B-humann/337-15B.filtered_humann_temp
+
+bsub -q bigmem -J tar-15L tar -czvf 337-15L-humann/337-15L-humann-temp.tar.gz 337-15L-humann/337-15L.filtered_humann_temp
+
+bsub -q bigmem -J tar-16N tar -czvf 337-16N-humann/337-16N-humann-temp.tar.gz 337-16N-humann/337-16N.filtered_humann_temp
+
+bsub -q bigmem -J tar-172M tar -czvf 337-172M-humann/337-172M-humann-temp.tar.gz 337-172M-humann/337-172M.filtered_humann_temp
+
+bsub -q bigmem -J tar-15R tar -czvf 337-15R-humann/337-15R-humann-temp.tar.gz 337-15R-humann/337-15R.filtered_humann_temp
+
+bsub -q bigmem -J tar-184M tar -czvf 337-184M-humann/337-184M-humann-temp.tar.gz 337-184M-humann/337-184M.filtered_humann_temp
+
+
+#metaphlan abs count
+
+bsub -q bigmem -J meta-23M metaphlan 352-23M.filtered.fastq.gz --input_type fastq --bowtie2out 352-23M.bowtie2.bz2 --nproc 5 -t rel_ab_w_read_stats -o 352-23M.abs.txt
+
+bsub -q bigmem -J meta-73M metaphlan 352-73M.filtered.fastq.gz --input_type fastq --bowtie2out 352-73M.bowtie2.bz2 --nproc 5 -t rel_ab_w_read_stats -o 352-73M.abs.txt
+
+bsub -q bigmem -J meta-20M metaphlan 352-20M.filtered.fastq.gz --input_type fastq --bowtie2out 352-20M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-20M.abs.txt
+
+bsub -q bigmem -J meta-71M metaphlan 352-71M.filtered.fastq.gz --input_type fastq --bowtie2out 352-71M.bowtie2.bz2 --nproc 5 -t rel_ab_w_read_stats -o 352-71M.abs.txt
+
+bsub -q bigmem -J meta-80M metaphlan 352-80M.filtered.fastq.gz --input_type fastq --bowtie2out 352-80M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-80M.abs.txt
+
+bsub -q bigmem -J meta-55M metaphlan 352-55M.filtered.fastq.gz --input_type fastq --bowtie2out 352-55M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-55M.abs.txt
+
+bsub -q bigmem -J meta-81M metaphlan 352-81M.filtered.fastq.gz --input_type fastq --bowtie2out 352-81M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-81M.abs.txt
+
+bsub -q bigmem -J meta-72M metaphlan 352-72M.filtered.fastq.gz --input_type fastq --bowtie2out 352-72M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-72M.abs.txt
+
+bsub -q bigmem -J meta-40M metaphlan 352-40M.filtered.fastq.gz --input_type fastq --bowtie2out 352-40M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-40M.abs.txt
+
+bsub -q bigmem -J meta-53M metaphlan 352-53M.filtered.fastq.gz --input_type fastq --bowtie2out 352-53M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-53M.abs.txt
+
+bsub -q bigmem -J meta-70M metaphlan 352-70M.filtered.fastq.gz --input_type fastq --bowtie2out 352-70M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 352-70M.abs.txt
+
+bsub -q bigmem -J meta-9N metaphlan 337-9N.filtered.fastq.gz --input_type fastq --bowtie2out 337-9N.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-9N.abs.txt
+
+bsub -q bigmem -J meta-5N metaphlan 337-5N.filtered.fastq.gz --input_type fastq --bowtie2out 337-5N.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-5N.abs.txt
+
+bsub -q bigmem -J meta-15N metaphlan 337-15N.filtered.fastq.gz --input_type fastq --bowtie2out 337-15N.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-15N.abs.txt
+
+bsub -q bigmem -J meta-15L metaphlan 337-15L.filtered.fastq.gz --input_type fastq --bowtie2out 337-15L.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-15L.abs.txt
+
+bsub -q bigmem -J meta-15R metaphlan 337-15R.filtered.fastq.gz --input_type fastq --bowtie2out 337-15R.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-15R.abs.txt
+
+bsub -q bigmem -J meta-15B metaphlan 337-15B.filtered.fastq.gz --input_type fastq --bowtie2out 337-15B.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-15B.abs.txt
+
+bsub -q bigmem -J meta-12N metaphlan 337-12N.filtered.fastq.gz --input_type fastq --bowtie2out 337-12N.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-12N.abs.txt
+
+bsub -q bigmem -J meta-4N metaphlan 337-4N.filtered.fastq.gz --input_type fastq --bowtie2out 337-4N.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-4N.abs.txt
+
+bsub -q bigmem -J meta-4R metaphlan 337-4R.filtered.fastq.gz --input_type fastq --bowtie2out 337-4R.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-4R.abs.txt
+
+bsub -q bigmem -J meta-8L metaphlan 337-8L.filtered.fastq.gz --input_type fastq --bowtie2out 337-8L.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-8L.abs.txt
+
+bsub -q bigmem -J meta-16L metaphlan 337-16L.filtered.fastq.gz --input_type fastq --bowtie2out 337-16L.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-16L.abs.txt
+
+bsub -q bigmem -J meta-16R metaphlan 337-16R.filtered.fastq.gz --input_type fastq --bowtie2out 337-16R.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-16R.abs.txt
+
+bsub -q bigmem -J meta-16N metaphlan 337-16N.filtered.fastq.gz --input_type fastq --bowtie2out 337-16N.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-16N.abs.txt
+
+bsub -q bigmem -J meta-16B metaphlan 337-16B.filtered.fastq.gz --input_type fastq --bowtie2out 337-16B.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-16B.abs.txt
+
+bsub -q bigmem -J meta-184M metaphlan 337-184M.filtered.fastq.gz --input_type fastq --bowtie2out 337-184M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-184M.abs.txt
+
+bsub -q bigmem -J meta-172M metaphlan 337-172M.filtered.fastq.gz --input_type fastq --bowtie2out 337-172M.bowtie2.bz2 --nproc 12 -t rel_ab_w_read_stats -o 337-172M.abs.txt
+
+#humann join table
+bsub -q normal humann_join_tables -i ./ -o  join_path.tsv
+bsub -q normal humann_join_tables -i ./ -o  join_gene.tsv
+
+#humann regroup gene to ec
+bsub -q bigmem humann_regroup_table -i join_gene.tsv -g uniref90_level4ec -o./join_ec.tsv
+
+
+#renorm RPK to cpm
+bsub -q normal humann_renorm_table -i join_path.tsv -o path_cpm.tsv -u cpm --update-snames
+bsub -q bigmem humann_renorm_table -i join_ec.tsv -o ec_cpm.tsv -u cpm --update-snames
+
+#split stratified table
+bsub -q normal humann_split_stratified_table -i path_cpm.tsv -o ./
+bsub -q bigmem humann_split_stratified_table -i ec_cpm.tsv -o ./
+
+
+
+
+
+
