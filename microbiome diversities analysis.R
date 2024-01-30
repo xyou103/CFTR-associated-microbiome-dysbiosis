@@ -542,3 +542,282 @@ for (x in c("dist_bray.W14", "dist_jac.W14","dist_w.UniFrac.W14","dist_un.UniFra
   rm(td,ad,x)
 }
 
+####weighted UniFrac NMDS####
+nmds.w.unifrac <- vegan::metaMDS(dist_w.UniFrac, autotransform = F, k=3)
+
+nmds.w.unifrac.df <- data.frame(nmds1 = nmds.w.unifrac$points[,1], 
+                                nmds2 = nmds.w.unifrac$points[,2],
+                                nmds3 = nmds.w.unifrac$points[,3])
+
+nmds.w.unifrac.df <- nmds.w.unifrac.df %>% 
+  rownames_to_column(var="ID") %>% 
+  merge(metadata,by="ID") %>% 
+  mutate(Genotype_Age=factor(Genotype_Age,
+                             level=c("WT_4wk","CF_4wk","WT_14wk","CF_14wk")))
+
+w.unifrac.centroid <- nmds.w.unifrac.df  %>%
+group_by(Genotype_Age) %>%
+summarize(centroid_nmds1 = mean(nmds1), 
+          centroid_nmds2 = mean(nmds2),
+          centroid_nmds3 = mean(nmds3))
+                                                                              
+nmds.w.unifrac.df  <- merge(nmds.w.unifrac.df, w.unifrac.centroid, by = "Genotype_Age", all.x = TRUE)                                                        
+                                                                                                                                                            
+nmds_w.UniFrac_plot_P1P2 <- ggplot() +
+  geom_point(data=nmds.w.unifrac.df, aes(x=nmds1, y=nmds2, color=Genotype_Age), size=4) + theme_minimal() +
+  xlab(paste("NMDS1"))+ 
+  ylab(paste("NMDS2"))+ 
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        legend.position = "none",
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Weighted UniFrac")+
+  geom_segment(data = nmds.w.unifrac.df, 
+               aes(x = nmds1, y = nmds2, 
+                   xend = centroid_nmds1, yend = centroid_nmds2, 
+                   group = Genotype_Age, color=Genotype_Age), 
+               linetype = "dashed")  +
+  geom_label (data = nmds.w.unifrac.df, aes(x = centroid_nmds1, 
+                                            y = centroid_nmds2, 
+                                            label=Genotype_Age,
+                                            color=Genotype_Age))
+
+
+nmds_w.UniFrac_plot_P1P3 <- ggplot() +
+  geom_point(data=nmds.w.unifrac.df, aes(x=nmds1, y=nmds3, color=Genotype_Age), size=4) + theme_minimal() +
+  xlab(paste("NMDS1"))+ 
+  ylab(paste("NMDS3"))+ 
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        legend.position = "none",
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Weighted UniFrac")+
+  geom_segment(data = nmds.w.unifrac.df, 
+               aes(x = nmds1, y = nmds3, 
+                   xend = centroid_nmds1, yend = centroid_nmds3, 
+                   group = Genotype_Age, color=Genotype_Age), 
+               linetype = "dashed")  +
+  geom_label (data = nmds.w.unifrac.df, 
+              aes(x = centroid_nmds1, y = centroid_nmds3, label=Genotype_Age, color=Genotype_Age))
+
+
+tiff("Figures/nmds_w.UniFrac_plot_P1P3_2.tiff", units="in", width = 4, height=4, res=600, compression="lzw")
+nmds_w.UniFrac_plot_P1P3
+dev.off()
+
+tiff("Figures/nmds_w.UniFrac_plot_P1P2_2.tiff", units="in", width = 4, height=4, res=600, compression="lzw")
+nmds_w.UniFrac_plot_P1P2
+dev.off()
+
+plot_ly(x=nmds.w.unifrac.df$nmds1, 
+        y=nmds.w.unifrac.df$nmds2, 
+        z=nmds.w.unifrac.df$nmds3, 
+        color=nmds.w.unifrac.df$Genotype_Age,
+        size=1)
+
+
+
+plot_ly(x=nmds.un.unifrac.df$nmds1, 
+        y=nmds.un.unifrac.df$nmds2, 
+        z=nmds.un.unifrac.df$nmds3, 
+        color=nmds.un.unifrac.df$Genotype_Age,
+        size=1)
+
+
+####un-weighted NDMS####
+nmds.un.unifrac <- vegan::metaMDS(dist_un.UniFrac, autotransform = F, k=3)
+
+nmds.un.unifrac.df <- data.frame(nmds1 = nmds.un.unifrac$points[,1], 
+                                nmds2 = nmds.un.unifrac$points[,2],
+                                nmds3 = nmds.un.unifrac$points[,3])
+
+nmds.un.unifrac.df <- nmds.un.unifrac.df %>% rownames_to_column(var="ID") %>% 
+  merge(metadata,by="ID") %>% mutate(Genotype_Age=factor(Genotype_Age,level=c("WT_4wk","CF_4wk",
+                                                                              "WT_14wk","CF_14wk")))
+
+un.unifrac.centroid <- nmds.un.unifrac.df  %>%
+  group_by(Genotype_Age) %>%
+  summarize(centroid_nmds1 = mean(nmds1), 
+            centroid_nmds2 = mean(nmds2),
+            centroid_nmds3 = mean(nmds3))
+
+nmds.un.unifrac.df  <- merge(nmds.un.unifrac.df, un.unifrac.centroid, by = "Genotype_Age", all.x = TRUE)  
+
+
+nmds_un.UniFrac_plot_P1P3 <- ggplot(nmds.un.unifrac.df, 
+                              aes(x=nmds1, y=nmds3,color=Genotype_Age)) +
+  geom_point(size=4) + theme_minimal() +
+  xlab(paste("NMDS1"))+
+  ylab(paste("NMDS3"))+
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        legend.position = "none",
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Unweighted UniFrac")+
+  geom_segment(data = nmds.un.unifrac.df, 
+               aes(x = nmds1, y = nmds3, 
+                   xend = centroid_nmds1, yend = centroid_nmds3, 
+                   group = Genotype_Age, color=Genotype_Age), 
+               linetype = "dashed")  +
+  stat_ellipse(data = nmds.un.unifrac.df, aes(x = nmds1, y = nmds3, color = Genotype_Age), 
+               level = 0.95)+
+  geom_label (data = nmds.un.unifrac.df, 
+              aes(x = centroid_nmds1, y = centroid_nmds3, label=Genotype_Age, color=Genotype_Age))
+
+
+
+nmds_un.UniFrac_plot_P1P2 <- ggplot(nmds.un.unifrac.df, 
+                                    aes(x=nmds1, y=nmds2,color=Genotype_Age)) +
+  geom_point(size=4) + theme_minimal() +
+  xlab(paste("NMDS1"))+
+  ylab(paste("NMDS2"))+
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        legend.position = "none",
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Unweighted UniFrac")+
+  geom_segment(data = nmds.un.unifrac.df, 
+               aes(x = nmds1, y = nmds2, 
+                   xend = centroid_nmds1, yend = centroid_nmds2, 
+                   group = Genotype_Age, color=Genotype_Age), 
+               linetype = "dashed")  + 
+  stat_ellipse(data = nmds.un.unifrac.df, aes(x = nmds1, y = nmds2, color = Genotype_Age), 
+               level = 0.95)+
+  geom_label (data = nmds.un.unifrac.df, 
+              aes(x = centroid_nmds1, 
+                  y = centroid_nmds2, 
+                  label=Genotype_Age, 
+                  color=Genotype_Age))
+
+
+
+tiff("Figures/nmds_un.UniFrac_plot_P1P2_2.tiff", units="in", width = 4, height=4, res=600, compression="lzw")
+nmds_un.UniFrac_plot_P1P2 
+dev.off()
+
+tiff("Figures/nmds_un.UniFrac_plot_P1P3_2.tiff", units="in", width = 4, height=4, res=600, compression="lzw")
+nmds_un.UniFrac_plot_P1P3
+dev.off()
+
+####dispersion analysis#####
+disp.w.uni.4wk <- betadisper(dist_w.UniFrac.W4, group =metadata.W4$Genotype)
+permutest(disp.w.uni.4wk, pairwise=TRUE, permutations=1000)
+
+disp.un.uni.4wk <- betadisper(dist_un.UniFrac.W4, group =metadata.W4$Genotype)
+permutest(disp.un.uni.4wk, pairwise=TRUE, permutations=1000)
+
+disp.w.uni.14wk <- betadisper(dist_w.UniFrac.W14, group =metadata.W14$Genotype)
+permutest(disp.w.uni.14wk, pairwise=TRUE, permutations=1000)
+
+disp.un.uni.14wk <- betadisper(dist_un.UniFrac.W14, group =metadata.W14$Genotype)
+permutest(disp.un.uni.14wk, pairwise=TRUE, permutations=1000)
+
+####PCoA plot weighted####
+pcoa_w.UniFrac_plot_P1P2 <- ggplot(pcoa_w.UniFrac.df, 
+                              aes(x=pcoa1, y=pcoa2,color=Genotype_Age)) +
+  geom_point(size=4) + theme_minimal() +
+  xlab(paste("PCoA1"," (", paste(pcoa_w.UniFrac.pc$PCvar[1]), "%)"))+
+  ylab(paste("PCoA2"," (", paste(pcoa_w.UniFrac.pc$PCvar[2]), "%)"))+
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Weighted UniFrac")
+
+pcoa_w.UniFrac_plot_P1P3 <- ggplot(pcoa_w.UniFrac.df, 
+                                   aes(x=pcoa1, y=pcoa3,color=Genotype_Age)) +
+  geom_point(size=4) + theme_minimal() +
+  xlab(paste("PCoA1"," (", paste(pcoa_w.UniFrac.pc$PCvar[1]), "%)"))+
+  ylab(paste("PCoA3"," (", paste(pcoa_w.UniFrac.pc$PCvar[3]), "%)"))+
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Weighted UniFrac")
+
+
+tiff("Figures/pcoa.w.UniFrac.P1P2.tiff", units="in", width = 5, height=4, res=600, compression="lzw")
+pcoa_w.UniFrac_plot_P1P2+stat_ellipse(level=0.95)
+dev.off()
+
+tiff("Figures/pcoa.w.UniFrac.P1P3.tiff", units="in", width = 5, height=4, res=600, compression="lzw")
+pcoa_w.UniFrac_plot_P1P3+stat_ellipse(level=0.95)
+dev.off()
+
+####PCoA plot unweighted#####
+pcoa_un.UniFrac_plot_P1P2 <- ggplot(pcoa_un.UniFrac.df, 
+                               aes(x=pcoa1, y=pcoa2, color=Genotype_Age)) +
+  geom_point(size=4) + theme_minimal() +
+  xlab(paste("PCoA1"," (", paste(pcoa_un.UniFrac.pc$PCvar[1]), "%)"))+
+  ylab(paste("PCoA2"," (", paste(pcoa_un.UniFrac.pc$PCvar[2]), "%)"))+
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Unweighted UniFrac")
+
+pcoa_un.UniFrac_plot_P1P3 <- ggplot(pcoa_un.UniFrac.df, 
+                                    aes(x=pcoa1, y=pcoa3, color=Genotype_Age)) +
+  geom_point(size=4) + theme_minimal() +
+  xlab(paste("PCoA1"," (", paste(pcoa_un.UniFrac.pc$PCvar[1]), "%)"))+
+  ylab(paste("PCoA3"," (", paste(pcoa_un.UniFrac.pc$PCvar[3]), "%)"))+
+  scale_color_manual(values=c("#056943","#585858","#3951A2","#A80326"))+
+  theme(legend.key = element_rect(fill = NA, colour = NA, size = 2),
+        legend.title = element_text(color="black",size=12.5),
+        legend.text = element_text(color="black",size=11.5),
+        panel.background = element_blank(),
+        plot.title = element_text(size=14.5, hjust = 0.5, face="bold"), 
+        axis.title= element_text(color="black",size=12.5, face="bold"), 
+        axis.text= element_text(color="black",size=11.5, face="bold"), 
+        panel.border = element_rect(colour = "black", fill=NA))+
+  ggtitle("Unweighted UniFrac")
+
+tiff("Figures/pcoa.un.UniFrac_P1P2.tiff", units="in", width = 5, height=4, res=600, compression="lzw")
+pcoa_un.UniFrac_plot_P1P2+ stat_ellipse(level=0.95)
+dev.off()
+
+tiff("Figures/pcoa.un.UniFrac_P1P3.tiff", units="in", width = 5, height=4, res=600, compression="lzw")
+pcoa_un.UniFrac_plot_P1P3+ stat_ellipse(level=0.95)
+dev.off()
+
+
+
